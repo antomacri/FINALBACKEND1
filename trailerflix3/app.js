@@ -2,7 +2,8 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-
+// para evitar TypeError: Cannot read property '_id' of undefined
+const bodyParser = require('body-parser');
 dotenv.config();
 
 const app = express();
@@ -13,100 +14,158 @@ const partialJsonPath = process.env.PARTIAL_JSON_PATH;
 app.set('view engine', 'ejs');
 //app.use(express.static('views'))
 app.use(express.static(path.join(__dirname,'views')))
-const película= [
-    { name: 'Peliculas', price: 0 },
-    { name: 'Series', price: 0 },
-    { name: 'Actriz', price: 0 }
-]
 
+app.use(bodyParser.json());
 
-// Configurar la ubicación de las vistas (plantillas)
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Cargar datos desde el archivo JSON en una constante TRAILERFLIX
-const rawData = fs.readFileSync(partialJsonPath, 'utf-8');
-const TRAILERFLIX = JSON.parse(rawData);
-
-// Endpoint para la ruta raíz
-
-app.get('/', (req, res) => {
-  const welcomeMessage = '<h1>Bienvenido a TrailerFlix</h1>';
- 
-  res.send(welcomeMessage);
-
-
-// Configurar EJS como el motor de plantillas
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-app.get("/inicio", (req, res) => {
-  // TRAILERFLIX es JSON con las rutas de las imágenes y las URL de los trailers
-  res.render('inicio', {catalogo: TRAILERFLIX });
-  
+// incluyo funciones declaradas en mongodb.js
+const { connectToMongodb, disconnectToMongodb} = require('./src/mongodb')
+//Middleware
+app.use((req, res, next) => {
+    res.header("Content-Type", "application/json; charset=utf-8");
+    next();
 });
-//Renderiza la vista de index.ejs
+app.get('/', (req, res) => { res.status(200).end('¡Bienvenido a la API de trailers!'); } );
 
-app.get('/index',(req,res)=>{
-res.render('index');{ catalogo: TRAILERFLIX}
-
-});
-});
-
-// Endpoint para listar el catálogo completo
-app.get('/catalogo', (req, res) => {
-    res.render('catalogo', { catalogo: TRAILERFLIX });
-  });
-
-
-// Ruta para  la búsqueda
-app.get('/buscar', (req, res) => {
-  const query = req.query.q.toLowerCase();
-  const results = TRAILERFLIX.filter((item) =>
-    item.titulo.toLowerCase().includes(query));
-  res.json({ resultados: results, query: query });
-  console.log("Se ha llamado a la ruta de búsqueda");
-});
-
-// Endpoint para buscar por título
-app.get('/titulo/:title', (req, res) => {
-    const titleParam = req.params.title.toLowerCase();
-    const filteredContent = TRAILERFLIX.filter(item => item.titulo.toLowerCase().includes(titleParam));
-    res.json(filteredContent);
-  });
-  
-  // Endpoint para buscar por categoría
-  app.get('/categoria/:cat', (req, res) => {
-    const categoryParam = req.params.cat.toLowerCase();
-    const filteredContent = TRAILERFLIX.filter(item => item.categoria.toLowerCase() === categoryParam);
-    res.json(filteredContent);
-  });
-  
-  // Endpoint para buscar por actor/actriz en el reparto
-  app.get('/reparto/:act', (req, res) => {
-    const actorParam = req.params.act.toLowerCase();
-    const filteredContent = TRAILERFLIX.filter(item => item.reparto.toLowerCase().includes(actorParam));
-    res.json(filteredContent);
-  });
-  
-  // Endpoint para obtener la URL del tráiler
-  app.get('/trailer/:id', (req, res) => {
-    const idParam = req.params.id;
-    const movie = TRAILERFLIX.find(item => item.id === idParam);
-    if (movie) {
-      if (movie.trailer) {
-        res.json({ url: movie.trailer });
-      } else {
-        res.json({ message: 'Tráiler no disponible para esta película/serie' });
-      }
-    } else {
-      res.status(404).json({ error: 'Película/serie no encontrada' });
+//Endpoints
+app.get('/frutas', async (req, res) => {
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
     }
-  });
-  
-
-// Aquí puedes agregar los demás endpoints según las búsquedas requeridas
-
-app.listen(port, () => {
-  console.log(`Servidor web en http://localhost:${port}`);
+    const db = client.db('frutas')
+    const frutas = await db.collection('frutas').find().toArray()
+    await disconnectToMongodb()
+    res.json(frutas)
 });
+// Metodos de lectura
+app.get('/frutas/:id', async (req, res) => {
+    const frutaID = parseInt(req.params.id) || 0
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    const db = client.db('frutas')
+    const fruta = await db.collection('frutas').findOne({ id: frutaID})
+    await disconnectToMongodb()
+    !fruta ? res.status(404).send('No encontre la fruta con el id '+ frutaID): res.json(fruta)
+});
+
+app.get('/frutas/nombre/:nombre', async (req, res) => {
+    const nombreFruta = req.params.nombre
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    const regex = new RegExp(nombreFruta.toLowerCase(), 'i');
+    const db = client.db('frutas')
+    const frutas = await db.collection('frutas').find({ nombre: regex}).toArray()
+    await disconnectToMongodb()
+    frutas.length == 0 ? res.status(404).send('No encontre la fruta con el nombre '+ nombreFruta): res.json(frutas)
+})
+
+app.get('/frutas/precio/:precio', async (req, res) => {
+    const precioFruta = parseInt(req.params.precio) || 0
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    const db = client.db('frutas') 
+    // gte: mayor o igual a
+    const frutas = await db.collection('frutas').find({ importe: { $gte: precioFruta } }).toArray()
+    await disconnectToMongodb()
+    frutas.length == 0 ? res.status(404).send('No encontre la fruta con el precio '+ precioFruta): res.json(frutas)
+
+})
+
+// Metodo de creacion
+app.post('/frutas', async (req, res) => { 
+    const nuevaFruta = req.body
+    if (nuevaFruta === undefined) {
+        res.status(400).send('Error en el formato de los datos de la fruta')
+    }
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    const db = client.db('frutas') 
+    const collection = await db.collection('frutas').insertOne(nuevaFruta)
+        .then(() => {
+            console.log('Nueva fruta creada')
+            res.status(201).send(nuevaFruta)
+        }).catch(err => { 
+            console.error(err)
+        }).finally(() => { client.close()})
+})
+
+// Metodo de actualizacion
+app.put('/frutas/:id', async (req, res) => { 
+    const id = parseInt(req.params.id) || 0;
+    const nuevosDatos = req.body
+    if (!nuevosDatos) {
+        res.status(400).send('Error en el formato de los datos recibidos')
+    }
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    const db = client.db('frutas') 
+    // ,{hint:true} 
+    const collection = await db.collection('frutas').updateOne({ id: id }, { $set: nuevosDatos })
+        .then(() => {
+            let mensaje ='Fruta actualizado ID : ' + id
+          res.status(200).json({ descripcion: mensaje , objeto: nuevosDatos})
+        }).catch(err => { 
+            let mensaje = 'Error al actualizar ID: ' + id 
+            console.error(err)
+            res.status(500).json({descripcion : mensaje, objeto: nuevosDatos})
+        }).finally(() => {
+            client.close()
+        })
+})
+
+// Metodo de eliminacion
+app.delete('/frutas/:id', async (req, res) => { 
+    const id = req.params.id;
+    if (!id) {
+        res.status(400).send('Error en el formato del id recibido')
+    }
+    const client = await connectToMongodb();
+    if (!client) {
+        res.status(500).send('Error al conectarse a MongoDB')
+        return;
+    }
+    client.connect()
+        .then(() => { 
+            const collection = client.db('frutas').collection('frutas')
+            return collection.deleteOne({id: parseInt(id)})
+        }).then((resultado) => {
+            if (resultado.deletedCount === 0) {
+                res.status(404).send('No se pudo encontrar la fruta con id: '+id)
+            } else {
+                console.log('Fruta Eliminada')
+                res.status(204).send('Fruta Eliminada')
+            }
+        }).catch((err) => {
+            console.error(err)
+             res.status(500).send('Error al eliminar fruta')
+        }).finally(() => {
+            client.close()
+        })
+})
+
+app.get("*", (req, res) => {
+  res.status(500).json({
+    message: "No se encuentra la ruta solicitada",
+  });
+});
+
+//Inicia el servidor
+app.listen(PORT, () => console.log(`API de frutas escuchando en http://localhost:${PORT}`) );
