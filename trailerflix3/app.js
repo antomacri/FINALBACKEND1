@@ -1,48 +1,39 @@
 const express = require('express');
+const app = express();
+const port = process.env.PORT || 3008;
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
-
+const Archivo = "trailerflix.json";
 dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 3008;
-const partialJsonPath = process.env.PARTIAL_JSON_PATH;
-
+let LeerDatos = function () {
+  let rawdata = fs.readFileSync(Archivo);
+  let Datos = JSON.parse(rawdata);
+  
+  return Datos;
+};
 // Inicializamos  el Motor de plantillas elegido 
 app.set('view engine', 'ejs');
-//app.use(express.static('views'))
+app.use(express.static('views'))
 app.use(express.static(path.join(__dirname,'views')))
-const película= [
-    { name: 'Peliculas', price: 0 },
-    { name: 'Series', price: 0 },
-    { name: 'Actriz', price: 0 }
-]
-
-
 // Configurar la ubicación de las vistas (plantillas)
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
+const peliculas =LeerDatos()
 
-// Cargar datos desde el archivo JSON en una constante TRAILERFLIX
-const rawData = fs.readFileSync(partialJsonPath, 'utf-8');
-const TRAILERFLIX = JSON.parse(rawData);
-
-// Endpoint para la ruta raíz
+//  Endpoint para la ruta raíz
 
 app.get('/', (req, res) => {
   const welcomeMessage = '<h1>Bienvenido a TrailerFlix</h1>';
  
   res.send(welcomeMessage);
+ });
 
 
-// Configurar EJS como el motor de plantillas
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
 
 app.get("/inicio", (req, res) => {
   // TRAILERFLIX es JSON con las rutas de las imágenes y las URL de los trailers
-  res.render('inicio', {catalogo: TRAILERFLIX });
+  res.render('inicio', {catalogo: peliculas });
   
 });
 //Renderiza la vista de index.ejs
@@ -51,7 +42,7 @@ app.get('/index',(req,res)=>{
 res.render('index');{ catalogo: TRAILERFLIX}
 
 });
-});
+
 
 // Endpoint para listar el catálogo completo
 app.get('/catalogo', (req, res) => {
