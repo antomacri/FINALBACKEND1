@@ -1,23 +1,57 @@
 const express = require('express');
+const app = express();
+const port = process.env.PORT || 3008;
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+<<<<<<< HEAD
 // para evitar TypeError: Cannot read property '_id' of undefined
 const bodyParser = require('body-parser');
+=======
+const Archivo = "trailerflix.json";
+>>>>>>> main
 dotenv.config();
-
-const app = express();
-const port = process.env.PORT || 3008;
-const partialJsonPath = process.env.PARTIAL_JSON_PATH;
-
+let LeerDatos = function () {
+  let rawdata = fs.readFileSync(Archivo);
+  let Datos = JSON.parse(rawdata);
+  
+  return Datos;
+};
 // Inicializamos  el Motor de plantillas elegido 
 app.set('view engine', 'ejs');
-//app.use(express.static('views'))
+app.use(express.static('views'))
 app.use(express.static(path.join(__dirname,'views')))
+<<<<<<< HEAD
 
 app.use(bodyParser.json());
 
 app.use(bodyParser.urlencoded({ extended: true }));
+=======
+// Configurar la ubicación de las vistas (plantillas)
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.json());
+const peliculas =LeerDatos()
+
+//  Endpoint para la ruta raíz
+
+app.get('/', (req, res) => {
+  const welcomeMessage = '<h1>Bienvenido a TrailerFlix</h1>';
+ 
+  res.send(welcomeMessage);
+ });
+
+
+
+app.get("/inicio", (req, res) => {
+  // TRAILERFLIX es JSON con las rutas de las imágenes y las URL de los trailers
+  res.render('inicio', {catalogo: peliculas });
+  
+});
+//Renderiza la vista de index.ejs
+
+app.get('/index',(req,res)=>{
+res.render('index');{ catalogo: TRAILERFLIX}
+>>>>>>> main
 
 // incluyo funciones declaradas en mongodb.js
 const { connectToMongodb, disconnectToMongodb} = require('./src/mongodb')
@@ -26,6 +60,7 @@ app.use((req, res, next) => {
     res.header("Content-Type", "application/json; charset=utf-8");
     next();
 });
+<<<<<<< HEAD
 app.get('/', (req, res) => { res.status(200).end('¡Bienvenido a la API de trailers!'); } );
 
 //Endpoints
@@ -52,6 +87,23 @@ app.get('/frutas/:id', async (req, res) => {
     const fruta = await db.collection('frutas').findOne({ id: frutaID})
     await disconnectToMongodb()
     !fruta ? res.status(404).send('No encontre la fruta con el id '+ frutaID): res.json(fruta)
+=======
+
+
+// Endpoint para listar el catálogo completo
+app.get('/catalogo', (req, res) => {
+    res.render('catalogo', { catalogo: TRAILERFLIX });
+  });
+
+
+// Ruta para  la búsqueda
+app.get('/buscar', (req, res) => {
+  const query = req.query.q.toLowerCase();
+  const results = TRAILERFLIX.filter((item) =>
+    item.titulo.toLowerCase().includes(query));
+  res.json({ resultados: results, query: query });
+  console.log("Se ha llamado a la ruta de búsqueda");
+>>>>>>> main
 });
 
 app.get('/frutas/nombre/:nombre', async (req, res) => {
